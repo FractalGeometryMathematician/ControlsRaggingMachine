@@ -1,17 +1,11 @@
-First version of the RAG tool that is going to be used for purpose of FRC coding. Currently contains a folder of information (3 txt files) with some random lines of information. Code made by chatgpt. Runs from the computer's command prompt. Has an initial prebuilt question, after which users can ask more questions. One python script, rag_agent.py. Along with this, I had to download these files using pip: langchain – the main framework you’re using to build your RAG pipeline.
+Second version of the RAG tool that is going to be used for purpose of FRC coding. Currently contains a folder of information (3 txt files) with some random lines of information. Code made by chatgpt. Runs from the computer's command prompt. Has an initial prebuilt question, after which users can ask more questions. One python script, rag_agent.py. Another python agent, index_builder.py. This needs to be run once after new documentation is added to the docs folder, as it uses faiss to make more efficient manner of holding data. The new data is stored in the folder faiss_index. Along with this, I had to new files, which are needed in addition to the old ones:
 
-langchain-community – holds many integrations (document loaders, vector stores, etc.).
+langchain-community
 
-langchain-huggingface – newer package that contains the Hugging Face LLM/embeddings connectors.
+langchain-huggingface
 
-faiss-cpu – vector database library that stores your document embeddings and does similarity search.
+faiss-cpu
 
-transformers – Hugging Face library for running language models locally.
+sentence-transformers/all-MiniLM-L6-v2 (embeddings)
 
-sentence-transformers – library (built on top of transformers) that provides embedding models.
-
-huggingface_hub – client for downloading and caching models from Hugging Face Hub.
-
-torch / torchvision / torchaudio – PyTorch (CPU version) for running neural nets like sentence-transformers and Flan-T5.
-
-and made a hugging face access token and account, the token being stored as an environmental variable in the computer.
+google/flan-t5-base (LLM, later, more verbose)
