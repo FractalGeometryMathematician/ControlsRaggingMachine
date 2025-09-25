@@ -86,8 +86,16 @@ with gr.Blocks(title="FRC RAG Mentor") as demo:
     out_answer = gr.Markdown(label="Answer")
     out_sources = gr.Markdown(label="Sources")
 
-    go.click(fn=ask, inputs=q, outputs=[out_answer, out_sources])
-    q.submit(fn=ask, inputs=q, outputs=[out_answer, out_sources])
+    go.click(fn=ask, inputs=q, outputs=[out_answer, out_sources], show_progress="full")
+    q.submit(fn=ask, inputs=q, outputs=[out_answer, out_sources], show_progress="full")
+
+     # --- Warmup on first page load ---
+    demo.load(
+        fn=lambda: ("👋 Model warmed up, ready for your first question!", ""),
+        inputs=None,
+        outputs=[out_answer, out_sources],
+        show_progress="full"
+    )
 
 if __name__ == "__main__":
     demo.launch()
