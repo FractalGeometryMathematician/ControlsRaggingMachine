@@ -1,2 +1,0 @@
-Retrieval-Augmented Generation (RAG) combines a large language model with an external database. 
-It allows the model to retrieve facts from documents before generating an answer.
