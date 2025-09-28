@@ -53,15 +53,26 @@ def ask(query: str):
     if not query or not query.strip():
         return "Please enter a question.", ""
 
+    # --- Step 1: Retrieve top documents with similarity scores ---
+    retrieved = db.similarity_search_with_score(query, k=3)
+
+    # --- Step 2: Decide whether retrieval is relevant ---
+    # If all top scores are below a threshold, skip RAG and use direct LLM.
+    SCORE_THRESHOLD = 0.45  # 🔸 you can tweak this; lower = more aggressive fallback
+
+    if not retrieved or all(score < SCORE_THRESHOLD for _, score in retrieved):
+        print(f"[Fallback] Low retrieval scores → using direct LLM for: {query}")
+        direct_prompt = f"Question: {query}\nAnswer clearly and concisely."
+        response = llm.invoke(direct_prompt)
+        return response.strip(), "*(Answered without retrieval)*"
+
+    # --- Step 3: If relevant, run through RAG as usual ---
     res = rag.invoke({"query": query})
     answer = res.get("result", "").strip()
     source_docs = res.get("source_documents", [])
 
     if not answer or answer.lower().startswith("i don't know"):
-        return (
-            "❓ Sorry, I couldn’t find anything about that in the training docs.",
-            ""
-        )
+        return "❓ Sorry, I couldn’t find anything about that in the training docs.", ""
 
     sources = "\n".join(
         f"- {doc.metadata.get('source','unknown')}" for doc in source_docs
@@ -71,7 +82,7 @@ def ask(query: str):
 
 
 with gr.Blocks(title="FRC RAG Mentor") as demo:
-    gr.Markdown("# FRC RAG Mentor\nAsk programming questions and get mentor-style answers with sources.")
+    gr.Markdown("# FRC RAG Mentor\nAsk programming questions and get mentor-style answers with sources. Specify language (either java or cpp")
     q = gr.Textbox(label="Your question", placeholder="e.g., How do I set up a Kraken pivot?")
     go = gr.Button("Ask")
     out_answer = gr.Markdown(label="Answer")
