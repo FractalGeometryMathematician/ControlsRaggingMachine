@@ -1,10 +1,1 @@
-title: RaggedMentor
-emoji: 📊
-colorFrom: purple
-colorTo: pink
-sdk: gradio
-sdk_version: 5.46.1
-app_file: app.py
-pinned: false
-license: apache-2.0
-short_description: FRC rookie team mentor demonstration
+RAG program designed to be a FRC code mentor. Relies on Ollama's Mistral model, FAISS for organizing and retrieving documentation, and LangChain. GUI made with Gradio. Ollama models can be switched in and out in app.py.
