@@ -1,12 +1,9 @@
 import gradio as gr
 from langchain_community.vectorstores import FAISS
 from langchain_huggingface import HuggingFaceEmbeddings
-from langchain.chains import RetrievalQA
 from langchain.prompts import PromptTemplate
-from langchain_ollama import OllamaLLM   # 👈 NEW
+from langchain_ollama import OllamaLLM
 import os
-
-# --- Remove the old T5 pipeline completely ---
 
 MENTOR_PROMPT = PromptTemplate(
     input_variables=["context", "question"],
@@ -36,60 +33,50 @@ if not os.path.isdir(INDEX_DIR):
     )
 
 db = FAISS.load_local(INDEX_DIR, embeddings, allow_dangerous_deserialization=True)
-retriever = db.as_retriever(search_type="similarity", search_kwargs={"k": 3})
 
 # ✅ NEW: Use Mistral through Ollama
 llm = OllamaLLM(model="mistral")
 
-rag = RetrievalQA.from_chain_type(
-    llm=llm,
-    retriever=retriever,
-    chain_type="stuff",
-    chain_type_kwargs={"prompt": MENTOR_PROMPT},
-    return_source_documents=True,
-)
-
 def ask(query: str):
     if not query or not query.strip():
-        return "Please enter a question.", ""
+        yield "Please enter a question.", ""
 
-    # --- Step 1: Retrieve top documents with similarity scores ---
+    # --- Step 1: Retrieve top documents ---
     retrieved = db.similarity_search_with_score(query, k=3)
+    SCORE_THRESHOLD = 0.45
 
-    # --- Step 2: Decide whether retrieval is relevant ---
-    # If all top scores are below a threshold, skip RAG and use direct LLM.
-    SCORE_THRESHOLD = 0.45  # 🔸 you can tweak this; lower = more aggressive fallback
-
+    # --- Step 2: If low retrieval relevance → stream direct LLM ---
     if not retrieved or all(score < SCORE_THRESHOLD for _, score in retrieved):
-        print(f"[Fallback] Low retrieval scores → using direct LLM for: {query}")
+        print(f"[Fallback] Low retrieval scores → streaming direct LLM for: {query}")
         direct_prompt = f"Question: {query}\nAnswer clearly and concisely."
-        response = llm.invoke(direct_prompt)
-        return response.strip(), "*(Answered without retrieval)*"
+        partial = ""
+        for chunk in llm.stream(direct_prompt):
+            partial += chunk
+            yield partial, "*(Answered without retrieval)*"
+        return
 
-    # --- Step 3: If relevant, run through RAG as usual ---
-    res = rag.invoke({"query": query})
-    answer = res.get("result", "").strip()
-    source_docs = res.get("source_documents", [])
+    # --- Step 3: Manual RAG + streaming ---
+    # Build context manually from retrieved docs
+    context = "\n\n".join(doc.page_content for doc, _ in retrieved)
+    rag_prompt = MENTOR_PROMPT.format(context=context, question=query)
 
-    if not answer or answer.lower().startswith("i don't know"):
-        return "❓ Sorry, I couldn’t find anything about that in the training docs.", ""
-
-    sources = "\n".join(
-        f"- {doc.metadata.get('source','unknown')}" for doc in source_docs
-    ) or "No sources found."
-
-    return answer, f"**Sources**:\n{sources}"
-
+    partial = ""
+    for chunk in llm.stream(rag_prompt):
+        partial += chunk
+        sources = "\n".join(f"- {doc.metadata.get('source','unknown')}" for doc, _ in retrieved) or "No sources found."
+        yield partial, f"**Sources**:\n{sources}"
 
 with gr.Blocks(title="FRC RAG Mentor") as demo:
-    gr.Markdown("# FRC RAG Mentor\nAsk programming questions and get mentor-style answers with sources. Specify language (either java or cpp")
+    gr.Markdown("# FRC RAG Mentor\nAsk programming questions and get mentor-style answers with sources. Specify language (either java or cpp)")
     q = gr.Textbox(label="Your question", placeholder="e.g., How do I set up a Kraken pivot?")
     go = gr.Button("Ask")
     out_answer = gr.Markdown(label="Answer")
     out_sources = gr.Markdown(label="Sources")
 
+    # ✅ Enable streaming here
     go.click(fn=ask, inputs=q, outputs=[out_answer, out_sources], show_progress="full")
     q.submit(fn=ask, inputs=q, outputs=[out_answer, out_sources], show_progress="full")
+
 
     demo.load(
         fn=lambda: ("👋 Model warmed up, ready for your first question!", ""),
